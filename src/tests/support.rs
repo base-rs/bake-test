@@ -21,7 +21,7 @@ impl TemporaryDirectory {
             .as_nanos();
         let identifier = TEMPORARY_DIRECTORY_ID.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
-            "bake-test-rust-{}-{unique}-{identifier}",
+            "bake-test-{}-{unique}-{identifier}",
             std::process::id()
         ));
         fs::create_dir(&path).expect("create temporary test directory");

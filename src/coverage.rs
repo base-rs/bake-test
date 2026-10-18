@@ -25,7 +25,7 @@ impl CoverageReport {
     fn new_in(temporary_directory: &Path) -> Result<Self> {
         let identifier = REPORT_ID.fetch_add(1, Ordering::Relaxed);
         let directory = temporary_directory.join(format!(
-            "bake-test-rust-coverage-{}-{identifier}",
+            "bake-test-coverage-{}-{identifier}",
             std::process::id()
         ));
 

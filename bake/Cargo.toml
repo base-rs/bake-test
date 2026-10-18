@@ -1,10 +1,13 @@
 [package]
-name = "bake-test-rust-project"
+name = "bake-test-project"
 version = "0.0.0"
 edition = "2024"
 publish = false
 
 [dependencies]
 bake = ">=0.19, <1"
-bake-cargo = "0.4.0"
-socketry-project = ">=0.3.9"
+bake-test = { version = "0.3.3", path = ".." }
+bake-agent-context = ">=0.3.2"
+bake-cargo = ">=0.5.0"
+bake-markdown = ">=0.3.0"
+bake-readme = ">=0.2.3"

@@ -1,10 +1,10 @@
 # Rust Testing Tasks
 
-Add `bake-test-rust` as a dependency of the private `bake/` package and regenerate its task links:
+Add `bake-test` as a dependency of the private `bake/` package and regenerate its task links:
 
 ```sh
 cargo bake --regenerate
-cargo add --manifest-path bake/Cargo.toml bake-test-rust
+cargo add --manifest-path bake/Cargo.toml bake-test
 cargo bake --regenerate
 ```
 
@@ -108,10 +108,10 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           components: clippy, llvm-tools-preview, rustfmt
-          # Isolate this source-installed tool from the old prebuilt-action cache.
-          cache-shared-key: coverage-cargo-install-v1
+          # Invalidate caches containing the retired socketry-cargo-bake launcher.
+          cache-shared-key: coverage-bake-launcher-v2
       - name: Install Bake launcher
-        run: cargo install socketry-cargo-bake --locked
+        run: cargo install bake --locked
       - name: Install coverage tool
         run: cargo install cargo-llvm-cov --locked
       - run: cargo fmt --all -- --check
@@ -161,7 +161,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions-rust-lang/setup-rust-toolchain@v2
       - name: Install Bake launcher
-        run: cargo install socketry-cargo-bake --locked
+        run: cargo install bake --locked
       - name: Run downstream compatibility tests
         run: cargo bake --locked test:external
 ```

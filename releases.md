@@ -1,5 +1,10 @@
 # Releases
 
+## v0.3.3
+
+- Publish as `bake-test` from `core-rs/bake-test`; update imports to `bake_test`.
+- Require a `Release: vVERSION` Git trailer on the final release commit; version changes alone no longer trigger publication.
+
 ## v0.3.2
 
 - Use Cargo-selected dependency versions and generated task links in setup instructions.
