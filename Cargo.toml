@@ -1,9 +1,9 @@
 [package]
-name = "bake-test-rust"
-version = "0.3.2"
+name = "bake-test"
+version = "0.3.3"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/socketry/bake-test-rust"
+repository = "https://github.com/core-rs/bake-test"
 description = "Reusable Rust test tasks for Bake"
 readme = "readme.md"
 include = ["src/**", "context/**", "Cargo.toml", "readme.md", "license.md", "releases.md"]
@@ -19,10 +19,10 @@ manifest = "bake/Cargo.toml"
 reviewers = ["core-rs/maintainers"]
 
 [patch.crates-io]
-bake-test-rust = { path = "." }
+bake-test = { path = "." }
 
 [lib]
-name = "bake_test_rust"
+name = "bake_test"
 
 [dependencies]
 bake = "0"

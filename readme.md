@@ -1,4 +1,4 @@
-# `bake-test-rust`
+# `bake-test`
 
 Reusable Bake tasks for running Rust tests and testing downstream repositories against local Cargo workspace packages.
 
@@ -12,7 +12,7 @@ Add the task crate to the private `bake/` package:
 
 ```sh
 cargo bake --regenerate
-cargo add --manifest-path bake/Cargo.toml bake-test-rust
+cargo add --manifest-path bake/Cargo.toml bake-test
 cargo bake --regenerate
 ```
 
@@ -38,13 +38,18 @@ See the [Rust Testing guide](context/testing.md) for the `test:before` hook, che
 
 ## Releasing
 
-Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or `bump --version X.Y.Z`), then run `cargo bake cargo:release` and open a pull request. After review and merge, GitHub Actions publishes the release when the configured `crates-io` environment approves it. Follow the shared [Releasing skill](https://github.com/socketry/socketry-project-rust/blob/main/context/releasing.md) for the standard process.
+Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or `bump --version X.Y.Z`), commit with a `Release: vVERSION` Git trailer, then run `cargo bake cargo:release` and open a pull request. After review and merge, GitHub Actions publishes the release when the configured `crates-io` environment approves it. Follow the shared [Releasing skill](https://github.com/core-rs/core-project/blob/main/context/releasing.md) for the standard process.
 
 ## Releases
 
 <!-- bake-readme:releases:start -->
 
 See [releases.md](releases.md) for the full release history.
+
+### v0.3.3
+
+- Publish as `bake-test` from `core-rs/bake-test`; update imports to `bake_test`.
+- Require a `Release: vVERSION` Git trailer on the final release commit; version changes alone no longer trigger publication.
 
 ### v0.3.2
 
@@ -56,20 +61,16 @@ See [releases.md](releases.md) for the full release history.
 - Require the aggregate test and coverage result for pull request merges.
 - Document the canonical aggregate test gate and current coverage dependency.
 
-### v0.3.0
-
-- Enforce complete source-region coverage, excluding regions inside invariant-only `unreachable!()` calls.
-
 <!-- bake-readme:releases:end -->
 
 ## See Also
 
-- [Bake](https://github.com/socketry/bake-rust)
-- [Bake Cargo](https://github.com/socketry/bake-cargo-rust)
+- [Bake](https://github.com/core-rs/bake)
+- [Bake Cargo](https://github.com/core-rs/bake-cargo)
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/socketry/bake-test-rust).
+Please open an issue or pull request on [GitHub](https://github.com/core-rs/bake-test).
 
 ### Agent Context
 

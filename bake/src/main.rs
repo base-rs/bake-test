@@ -7,6 +7,24 @@ fn main() -> Result<()> {
     Registry::discover()?.run()
 }
 
+// Bootstrap the renamed test crate before core-project can depend on it.
+#[bake::task(name = "cargo:after_version_bump")]
+fn after_version_bump(context: &mut bake::Context, version: String) -> Result<()> {
+    context.call("license:update", &[])?;
+    context.call("releases:update", &[&format!("v{version}")])?;
+    context.call("readme:update", &[])?;
+    context.call(
+        "markdown:normalize",
+        &[
+            "context/testing.md",
+            "license.md",
+            "readme.md",
+            "releases.md",
+        ],
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 #[bake::task(name = "test")]
 fn duplicate_test_task(#[bake(context)] _context: &mut bake::Context) -> Result<bake::Value> {
@@ -15,8 +33,8 @@ fn duplicate_test_task(#[bake(context)] _context: &mut bake::Context) -> Result<
 
 #[cfg(test)]
 mod tests {
+    use super::after_version_bump;
     use bake::{Arguments, Context, Parameter, Registry, Result, Task, Value};
-    use socketry_project::after_version_bump;
     use std::fs;
 
     #[test]
@@ -63,37 +81,39 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system clock is after the Unix epoch")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "bake-test-rust-bake-{}-{unique}",
-            std::process::id()
-        ));
-        fs::create_dir_all(&root).expect("create temporary Bake project");
-        let mut registry = Registry::new();
-        registry
-            .register(Task::new("license:update", "", Vec::new(), license_update))
-            .expect("register license task");
-        registry
-            .register(Task::new(
-                "releases:update",
-                "",
-                vec![Parameter::new::<String>("version")],
-                releases_update,
-            ))
-            .expect("register releases task");
-        registry
-            .register(Task::new("readme:update", "", Vec::new(), readme_update))
-            .expect("register readme task");
-        registry
-            .register(Task::new(
-                "markdown:normalize",
-                "",
-                vec![Parameter::new::<String>("paths").variadic()],
-                normalize_markdown,
-            ))
-            .expect("register Markdown task");
-        let mut context = registry.context(&root);
-
-        after_version_bump(&mut context, "1.2.3".to_owned()).expect("run release update tasks");
+        let root =
+            std::env::temp_dir().join(format!("bake-test-bake-{}-{unique}", std::process::id()));
+        fs::create_dir_all(root.join("context")).expect("create temporary Bake project");
+        fs::write(root.join("context/testing.md"), "# Testing\n").unwrap();
+        for task_count in 0..=4 {
+            let tasks = [
+                Task::new("license:update", "", Vec::new(), license_update),
+                Task::new(
+                    "releases:update",
+                    "",
+                    vec![Parameter::new::<String>("version")],
+                    releases_update,
+                ),
+                Task::new("readme:update", "", Vec::new(), readme_update),
+                Task::new(
+                    "markdown:normalize",
+                    "",
+                    vec![Parameter::new::<String>("paths").variadic()],
+                    normalize_markdown,
+                ),
+            ];
+            let missing = tasks.get(task_count).map(|task| task.name().to_owned());
+            let mut registry = Registry::new();
+            for task in tasks.into_iter().take(task_count) {
+                registry.register(task).expect("register hook task");
+            }
+            let result = after_version_bump(&mut registry.context(&root), "1.2.3".to_owned());
+            if let Some(missing) = missing {
+                assert!(result.unwrap_err().to_string().contains(&missing));
+            } else {
+                result.expect("run release update tasks");
+            }
+        }
 
         assert_eq!(
             fs::read_to_string(root.join("license-called")).unwrap(),
@@ -109,9 +129,8 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(root.join("markdown-paths")).unwrap(),
-            "license.md\nreadme.md\nreleases.md"
+            "context/testing.md\nlicense.md\nreadme.md\nreleases.md"
         );
-        drop(context);
         fs::remove_dir_all(root).expect("remove temporary Bake project");
     }
 }

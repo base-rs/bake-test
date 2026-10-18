@@ -5,7 +5,7 @@ use std::process::Command;
 
 #[test]
 fn executable_lists_discovered_tasks() {
-    let output = Command::new(env!("CARGO_BIN_EXE_bake-test-rust-project"))
+    let output = Command::new(env!("CARGO_BIN_EXE_bake-test-project"))
         .arg("--list")
         .output()
         .expect("run Bake task executable");
