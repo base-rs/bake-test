@@ -1,5 +1,9 @@
 # Releases
 
+## v0.3.4
+
+- Update package metadata and repository links for the `base-rs` organization.
+
 ## v0.3.3
 
 - Publish as `bake-test` from `core-rs/bake-test`; update imports to `bake_test`.

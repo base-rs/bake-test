@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 bake = ">=0.19, <1"
-bake-test = { version = "0.3.3", path = ".." }
+bake-test = { version = "0.3.4", path = ".." }
 bake-agent-context = ">=0.3.2"
 bake-cargo = ">=0.5.0"
 bake-markdown = ">=0.3.0"
