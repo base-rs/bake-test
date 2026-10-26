@@ -7,7 +7,7 @@ fn main() -> Result<()> {
     Registry::discover()?.run()
 }
 
-// Bootstrap the renamed test crate before core-project can depend on it.
+// Refresh release files through the directly linked task providers.
 #[bake::task(name = "cargo:after_version_bump")]
 fn after_version_bump(context: &mut bake::Context, version: String) -> Result<()> {
     context.call("license:update", &[])?;

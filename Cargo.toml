@@ -1,9 +1,9 @@
 [package]
 name = "bake-test"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/core-rs/bake-test"
+repository = "https://github.com/base-rs/bake-test"
 description = "Reusable Rust test tasks for Bake"
 readme = "readme.md"
 include = ["src/**", "context/**", "Cargo.toml", "readme.md", "license.md", "releases.md"]
@@ -16,7 +16,7 @@ resolver = "3"
 manifest = "bake/Cargo.toml"
 
 [workspace.metadata.bake.release]
-reviewers = ["core-rs/maintainers"]
+reviewers = ["base-rs/maintainers"]
 
 [patch.crates-io]
 bake-test = { path = "." }

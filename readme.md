@@ -38,13 +38,17 @@ See the [Rust Testing guide](context/testing.md) for the `test:before` hook, che
 
 ## Releasing
 
-Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or `bump --version X.Y.Z`), commit with a `Release: vVERSION` Git trailer, then run `cargo bake cargo:release` and open a pull request. After review and merge, GitHub Actions publishes the release when the configured `crates-io` environment approves it. Follow the shared [Releasing skill](https://github.com/core-rs/core-project/blob/main/context/releasing.md) for the standard process.
+Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or `bump --version X.Y.Z`), commit with a `Release: vVERSION` Git trailer, then run `cargo bake cargo:release` and open a pull request. After review and merge, GitHub Actions publishes the release when the configured `crates-io` environment approves it. Follow the shared [Releasing skill](https://github.com/base-rs/base-project/blob/main/context/releasing.md) for the standard process.
 
 ## Releases
 
 <!-- bake-readme:releases:start -->
 
 See [releases.md](releases.md) for the full release history.
+
+### v0.3.4
+
+- Update package metadata and repository links for the `base-rs` organization.
 
 ### v0.3.3
 
@@ -55,22 +59,16 @@ See [releases.md](releases.md) for the full release history.
 
 - Use Cargo-selected dependency versions and generated task links in setup instructions.
 
-### v0.3.1
-
-- Adopt `socketry-project` 0.3.7 for shared project tasks and Markdown normalization.
-- Require the aggregate test and coverage result for pull request merges.
-- Document the canonical aggregate test gate and current coverage dependency.
-
 <!-- bake-readme:releases:end -->
 
 ## See Also
 
-- [Bake](https://github.com/core-rs/bake)
-- [Bake Cargo](https://github.com/core-rs/bake-cargo)
+- [Bake](https://github.com/base-rs/bake)
+- [Bake Cargo](https://github.com/base-rs/bake-cargo)
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/bake-test).
+Please open an issue or pull request on [GitHub](https://github.com/base-rs/bake-test).
 
 ### Agent Context
 
