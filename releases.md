@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- Let a package exclude specific files from the coverage gate under `[[package.metadata.bake.test.coverage.exclude]]`, each with a required `reason`. The task rejects missing reasons, missing files, and duplicate entries, and always lists each excluded file with its reason and size in regions and lines.
+
 ## v0.3.4
 
 - Update package metadata and repository links for the `base-rs` organization.
