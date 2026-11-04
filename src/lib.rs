@@ -7,6 +7,7 @@
 //! calls the optional project task `test:before` before running Cargo tests.
 mod cargo;
 mod coverage;
+mod exclusions;
 mod external;
 mod manifest;
 mod metadata;
@@ -46,8 +47,10 @@ fn run(
 ///
 /// Documentation tests run through Cargo because `cargo-llvm-cov` does not
 /// currently support stable doctest coverage. The remaining test targets run
-/// under `cargo-llvm-cov`; source regions inside `unreachable!()` calls are
-/// excluded from the coverage gate.
+/// under `cargo-llvm-cov`; source regions inside `unreachable!()` calls, and
+/// files that workspace packages list with a reason under
+/// `package.metadata.bake.test.coverage.exclude`, are excluded from the
+/// coverage gate. The result always lists each excluded file and its size.
 #[bake::task(name = "test:coverage")]
 fn run_coverage(
     context: &mut Context,
@@ -63,6 +66,7 @@ fn run_coverage(
         ));
     }
 
+    let exclusions = exclusions::read(context)?;
     run_before_test_hook(context)?;
 
     let mut doc_arguments = vec!["test".to_owned()];
@@ -81,7 +85,7 @@ fn run_coverage(
     append_feature_arguments(&mut coverage_arguments, all_features, &features);
     cargo::run_with_output_path(context, &coverage_arguments, report.path())?;
 
-    let summary = report.read(context.root())?;
+    let summary = report.read(context.root(), &exclusions)?;
     if !summary.is_complete() {
         return Err(Error::new(summary.failure_message()));
     }

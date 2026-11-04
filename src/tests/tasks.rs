@@ -183,7 +183,7 @@ fn propagates_test_hook_and_cargo_failures() {
     let log = prepare_cargo(
         &environment,
         temporary_directory.path(),
-        &json!({}),
+        &workspace_metadata(temporary_directory.path(), vec![], vec![]),
         &json!({}),
     );
     let mut hook_context = context_with_hook(temporary_directory.path(), hook_fails);
@@ -221,7 +221,7 @@ fn runs_coverage_with_package_feature_and_target_options() {
     let log = prepare_cargo(
         &environment,
         temporary_directory.path(),
-        &json!({}),
+        &workspace_metadata(temporary_directory.path(), vec![], vec![]),
         &json!({}),
     );
     let mut context = context(temporary_directory.path());
@@ -266,7 +266,7 @@ fn coverage_excludes_unreachable_regions_and_rejects_uncovered_live_regions() {
     let log = prepare_cargo(
         &environment,
         temporary_directory.path(),
-        &json!({}),
+        &workspace_metadata(temporary_directory.path(), vec![], vec![]),
         &json!({}),
     );
     let source = "fn covered() {}\nunreachable!(\"Only JSX events can be mismatched here\")\n";
@@ -310,7 +310,7 @@ fn rejects_conflicting_coverage_options_and_reports_command_failures() {
     let log = prepare_cargo(
         &environment,
         temporary_directory.path(),
-        &json!({}),
+        &workspace_metadata(temporary_directory.path(), vec![], vec![]),
         &json!({}),
     );
     let mut context = context(temporary_directory.path());
@@ -357,6 +357,68 @@ fn rejects_conflicting_coverage_options_and_reports_command_failures() {
             .expect_err("coverage report directory creation should fail")
             .to_string()
             .contains("failed to create temporary coverage report directory")
+    );
+}
+
+fn workspace_with_coverage_exclusions(root: &Path, entries: JsonValue) -> JsonValue {
+    json!({
+        "workspace_root": root,
+        "workspace_members": ["root"],
+        "packages": [{
+            "id": "root",
+            "name": "root",
+            "manifest_path": root.join("Cargo.toml"),
+            "metadata": {"bake": {"test": {"coverage": {"exclude": entries}}}},
+        }],
+    })
+}
+
+#[cfg(unix)]
+#[test]
+fn coverage_lists_excluded_files_and_rejects_invalid_exclusions_before_testing() {
+    let temporary_directory = TemporaryDirectory::new();
+    let root = temporary_directory.path();
+    let environment = Environment::new();
+    let log = prepare_cargo(
+        &environment,
+        root,
+        &workspace_with_coverage_exclusions(
+            root,
+            json!([{"path": "src/coverage.rs", "reason": "Raw device calls."}]),
+        ),
+        &json!({}),
+    );
+    write_coverage_fixture(
+        &environment,
+        root,
+        "fn covered() {}\nfn device() {}\n",
+        &[(1, 1), (2, 0)],
+    );
+    let mut context = context(root);
+
+    assert_eq!(
+        run_coverage(&mut context, false, vec![], None, false)
+            .expect("the excluded file does not count towards the gate"),
+        "Region coverage passed: 0/0 measured source regions covered (excluded: 0 unreachable regions, 1 file)\n\
+         Excluded files, not counted towards the gate:\n  \
+         src/coverage.rs (2 regions, 1 covered; 2 lines): Raw device calls."
+    );
+
+    fs::write(
+        root.join("workspace-metadata.json"),
+        workspace_with_coverage_exclusions(root, json!([{"path": "src/coverage.rs"}])).to_string(),
+    )
+    .expect("write metadata without a reason");
+    fs::write(&log, "").expect("clear fake Cargo log");
+    assert!(
+        run_coverage(&mut context, false, vec![], None, false)
+            .expect_err("an exclusion without a reason should fail")
+            .to_string()
+            .contains("needs a nonempty reason")
+    );
+    assert_eq!(
+        fs::read_to_string(log).expect("read fake Cargo calls"),
+        "metadata --format-version 1 --no-deps\n"
     );
 }
 

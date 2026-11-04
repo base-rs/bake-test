@@ -29,11 +29,14 @@ pub(crate) struct Workspace {
 }
 
 pub(crate) fn read_workspace(context: &Context) -> Result<Workspace> {
-    let output = cargo::metadata_in(context.root(), true)?;
-    let metadata: Value = serde_json::from_slice(&output)
-        .map_err(|error| Error::new(format!("could not parse Cargo metadata: {error}")))?;
+    parse_workspace(&read_metadata(context)?)
+}
 
-    parse_workspace(&metadata)
+/// Reads the current workspace's Cargo metadata without dependencies.
+pub(crate) fn read_metadata(context: &Context) -> Result<Value> {
+    let output = cargo::metadata_in(context.root(), true)?;
+    serde_json::from_slice(&output)
+        .map_err(|error| Error::new(format!("could not parse Cargo metadata: {error}")))
 }
 
 fn parse_workspace(metadata: &Value) -> Result<Workspace> {
@@ -189,7 +192,7 @@ fn publishable_to_crates_io(package: &Value) -> bool {
     }
 }
 
-fn required_string(value: &Value, key: &str, description: &str) -> Result<String> {
+pub(crate) fn required_string(value: &Value, key: &str, description: &str) -> Result<String> {
     value
         .get(key)
         .and_then(Value::as_str)

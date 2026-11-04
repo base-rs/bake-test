@@ -40,6 +40,32 @@ _ => unreachable!("Only JSX events can be mismatched here")
 
 The macro asserts that the path should not be reached; it does not prove that the invariant is correct. Use `unreachable!()` only after checking the invariant against supported inputs. Test valid inputs and the boundary that establishes the invariant; do not manufacture an impossible private state solely to execute the panic. All other source-backed regions must reach 100% coverage.
 
+### Excluding files
+
+Some code cannot run in CI, for example raw calls into a headset runtime, a window system, or audio hardware. As a last resort, a package can exclude specific files from the gate in its own `Cargo.toml`:
+
+```toml
+[[package.metadata.bake.test.coverage.exclude]]
+path = "src/xr.rs"
+reason = "Raw OpenXR runtime calls; needs a headset runtime."
+```
+
+Exclusion is not a convenience; the default answer to uncovered code is a test. Keep logic out of excluded files: put only the untestable calls in a dedicated file, keep it thin, and keep the decisions around those calls in covered modules.
+
+- `path` names one existing file, relative to the package directory. It must stay inside the package, without `.` or `..` components. Glob patterns and directories are not supported, so each file carries its own reason and size, and a new file is measured until someone lists it.
+- `reason` is required and must not be blank. Explain why the file cannot be tested in CI.
+- The task reads the exclusions of every workspace member and fails before running tests if an entry has no reason, names a file that does not exist, or lists the same file twice. A renamed or deleted file therefore cannot leave a stale entry behind.
+
+The task still instruments excluded files. It removes their regions from the gate, then lists every excluded file with its reason and its size from the unfiltered report: its source regions, how many of them ran, and the lines they span. A file that is not compiled in the selected configuration, such as code for another target, is listed with no regions in this run. The listing appears whether the gate passes or fails:
+
+```text
+Region coverage passed: 52830/52830 measured source regions covered (excluded: 2 unreachable regions, 1 file)
+Excluded files, not counted towards the gate:
+  crates/client-quest/src/xr.rs (1124 regions, 0 covered; 651 lines): Raw OpenXR runtime calls; needs a headset runtime.
+```
+
+Exclusions are package metadata; there is no workspace-wide list, so each entry sits next to the code it describes.
+
 The canonical GitHub Actions workflow below installs the required Rust components and coverage tool. The task measures the runner's target and feature configuration. If a crate contains architecture-specific code, run the same gate on each supported architecture; each run checks the code compiled for its target.
 
 The coverage task runs documentation tests but does not include them in the coverage report; LLVM doctest coverage is still unstable. It uses the JSON function-region data to enforce 100% of measured source regions. This task measures source regions, not LLVM's separate experimental branch-coverage metric.

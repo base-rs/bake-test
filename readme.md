@@ -26,6 +26,16 @@ cargo bake test:external
 
 The coverage task runs documentation tests and requires 100% measured source-region coverage for the selected workspace test configuration. Regions inside `unreachable!()` calls are excluded automatically. It reports uncovered source locations when the gate fails. Install `cargo-llvm-cov` first; see the [Rust Testing guide](context/testing.md) for feature selection and architecture notes. Use `--package name` to limit a workspace run to one package.
 
+As a last resort, a package can exclude from the gate a file whose code cannot run in CI, such as raw device or platform calls. List each file in the package's `Cargo.toml` with a reason:
+
+```toml
+[[package.metadata.bake.test.coverage.exclude]]
+path = "src/xr.rs"
+reason = "Raw OpenXR runtime calls; needs a headset runtime."
+```
+
+The coverage summary always lists each excluded file with its reason and size. See [Excluding files](context/testing.md#excluding-files) for the rules.
+
 Configure downstream repositories in the root `Cargo.toml`:
 
 ```toml

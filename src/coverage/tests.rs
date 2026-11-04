@@ -5,6 +5,7 @@ use super::{
     CoverageReport, Position, SourceRegion, compare_regions, find_unreachable_macros,
     resolve_source_path, summarize,
 };
+use crate::exclusions::Exclusion;
 use crate::test_support::TemporaryDirectory;
 use serde_json::{Value, json};
 use std::fs;
@@ -77,7 +78,7 @@ fn merges_identical_source_regions_across_function_instantiations() {
         ],
     );
 
-    let summary = summarize(&report, directory.path()).expect("summarize coverage");
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize coverage");
 
     assert!(summary.is_complete());
     assert_eq!(summary.measured_regions, 1);
@@ -104,7 +105,7 @@ fn reuses_source_files_across_coverage_data_sets() {
     })
     .to_string();
 
-    let summary = summarize(&report, directory.path()).expect("summarize coverage");
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize coverage");
 
     assert!(summary.is_complete());
     assert_eq!(summary.measured_regions, 1);
@@ -127,7 +128,7 @@ fn keeps_distinct_source_ranges_on_the_same_line() {
         )],
     );
 
-    let summary = summarize(&report, directory.path()).expect("summarize coverage");
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize coverage");
 
     assert!(!summary.is_complete());
     assert_eq!(summary.measured_regions, 2);
@@ -158,7 +159,7 @@ fn sorts_uncovered_source_locations() {
         )],
     );
 
-    let summary = summarize(&report, directory.path()).expect("summarize coverage");
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize coverage");
     let message = summary.failure_message();
     let first_offset = source.find("first()").expect("first call");
     let second_offset = source.find("second()").expect("second call");
@@ -223,7 +224,7 @@ fn excludes_regions_within_multiline_unreachable_calls() {
         )],
     );
 
-    let summary = summarize(&report, directory.path()).expect("summarize coverage");
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize coverage");
 
     assert!(summary.is_complete());
     assert_eq!(summary.measured_regions, 1);
@@ -245,7 +246,7 @@ run();
         vec![function(&path, vec![region_for(source, "run()", 0)])],
     );
 
-    let summary = summarize(&report, directory.path()).expect("summarize coverage");
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize coverage");
 
     assert!(!summary.is_complete());
     assert_eq!(summary.excluded_unreachable_regions, 0);
@@ -270,7 +271,7 @@ fn measures_regions_with_macro_names_and_delimiters() {
         )],
     );
 
-    let summary = summarize(&report, directory.path()).expect("summarize coverage");
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize coverage");
 
     assert!(!summary.is_complete());
     assert_eq!(summary.measured_regions, 4);
@@ -295,7 +296,7 @@ fn ignores_non_executable_gap_and_skipped_regions() {
     regions.extend([gap, skipped]);
     let report = report(&path, vec![function(&path, regions)]);
 
-    let summary = summarize(&report, directory.path()).expect("summarize coverage");
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize coverage");
 
     assert!(summary.is_complete());
     assert_eq!(summary.measured_regions, 1);
@@ -312,7 +313,7 @@ fn resolves_relative_source_paths() {
     );
     let report = report.replace(&path.display().to_string(), "src/lib.rs");
 
-    let summary = summarize(&report, directory.path()).expect("resolve relative source");
+    let summary = summarize(&report, directory.path(), &[]).expect("resolve relative source");
 
     assert!(summary.is_complete());
     assert_eq!(summary.measured_regions, 1);
@@ -347,7 +348,7 @@ fn maps_source_regions_by_function_file_id() {
     })
     .to_string();
 
-    let summary = summarize(&report, directory.path()).expect("summarize multiple files");
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize multiple files");
 
     assert!(summary.is_complete());
     assert_eq!(summary.measured_regions, 2);
@@ -430,19 +431,19 @@ fn resolves_paths_when_source_files_cannot_be_canonicalized() {
 fn rejects_invalid_json_and_missing_report_sections() {
     let directory = TemporaryDirectory::new();
     assert!(
-        summarize("{", directory.path())
+        summarize("{", directory.path(), &[])
             .expect_err("invalid JSON")
             .to_string()
             .contains("invalid cargo-llvm-cov JSON report")
     );
     assert!(
-        summarize("{}", directory.path())
+        summarize("{}", directory.path(), &[])
             .expect_err("missing data")
             .to_string()
             .contains("no data array")
     );
     assert!(
-        summarize(&json!({"data": [{}]}).to_string(), directory.path())
+        summarize(&json!({"data": [{}]}).to_string(), directory.path(), &[])
             .expect_err("missing files")
             .to_string()
             .contains("no files array")
@@ -451,6 +452,7 @@ fn rejects_invalid_json_and_missing_report_sections() {
         summarize(
             &json!({"data": [{"files": [], "functions": []}]}).to_string(),
             directory.path(),
+            &[],
         )
         .expect_err("empty file list")
         .to_string()
@@ -460,6 +462,7 @@ fn rejects_invalid_json_and_missing_report_sections() {
         summarize(
             &json!({"data": [{"files": null, "functions": []}]}).to_string(),
             directory.path(),
+            &[],
         )
         .expect_err("files must be an array")
         .to_string()
@@ -474,6 +477,7 @@ fn rejects_source_file_and_function_metadata_errors() {
         summarize(
             &json!({"data": [{"files": [{}], "functions": []}]}).to_string(),
             directory.path(),
+            &[],
         )
         .expect_err("file requires filename")
         .to_string()
@@ -499,7 +503,7 @@ fn rejects_source_file_and_function_metadata_errors() {
     for (item, expected) in invalid_functions {
         let report = json!({"data": [item]}).to_string();
         assert!(
-            summarize(&report, directory.path())
+            summarize(&report, directory.path(), &[])
                 .expect_err("function metadata is incomplete")
                 .to_string()
                 .contains(expected)
@@ -547,7 +551,7 @@ fn rejects_malformed_regions_and_invalid_file_ids() {
     for (region, expected) in functions {
         let report = report(&path, vec![function(&path, vec![region])]);
         assert!(
-            summarize(&report, directory.path())
+            summarize(&report, directory.path(), &[])
                 .expect_err("malformed region")
                 .to_string()
                 .contains(expected)
@@ -575,7 +579,7 @@ fn rejects_invalid_source_coordinates_and_region_order() {
     for (region, expected) in invalid_regions {
         let report = report(&path, vec![function(&path, vec![region])]);
         assert!(
-            summarize(&report, directory.path())
+            summarize(&report, directory.path(), &[])
                 .expect_err("invalid region coordinates")
                 .to_string()
                 .contains(expected)
@@ -600,7 +604,7 @@ fn rejects_source_regions_that_split_utf8_characters() {
     let report = report(&path, vec![function(&path, vec![region])]);
 
     assert!(
-        summarize(&report, directory.path())
+        summarize(&report, directory.path(), &[])
             .expect_err("a byte offset inside a Unicode character should fail")
             .to_string()
             .contains("does not align with source text")
@@ -614,7 +618,7 @@ fn rejects_coverage_reports_without_function_regions() {
     let report = report(&path, vec![function(&path, vec![])]);
 
     assert!(
-        summarize(&report, directory.path())
+        summarize(&report, directory.path(), &[])
             .expect_err("report has no regions")
             .to_string()
             .contains("contains no source regions")
@@ -628,7 +632,7 @@ fn reports_covered_source_read_errors() {
     let report = report(&path, vec![]);
 
     assert!(
-        summarize(&report, directory.path())
+        summarize(&report, directory.path(), &[])
             .expect_err("missing source")
             .to_string()
             .contains("failed to read covered source file")
@@ -655,9 +659,120 @@ fn reports_missing_json_files() {
 
     assert!(
         report
-            .read(Path::new("."))
+            .read(Path::new("."), &[])
             .expect_err("missing report should fail")
             .to_string()
             .contains("failed to read coverage report")
+    );
+}
+
+fn excluded_file(
+    directory: &TemporaryDirectory,
+    name: &str,
+    source: &str,
+    reason: &str,
+) -> Exclusion {
+    let path = directory.path().join("src").join(name);
+    fs::create_dir_all(path.parent().expect("source parent")).expect("create source directory");
+    fs::write(&path, source).expect("write excluded source file");
+    Exclusion {
+        path: fs::canonicalize(&path).expect("canonical excluded path"),
+        display: format!("src/{name}"),
+        reason: reason.to_owned(),
+    }
+}
+
+/// Reports `lib.rs` with the given coverage, and `xr.rs` with uncovered device calls.
+fn report_with_device_file(
+    directory: &TemporaryDirectory,
+    library_count: u64,
+) -> (String, Vec<Exclusion>) {
+    let library_source = "fn work() { run(); }\n";
+    let library_path = source_path(directory, library_source);
+    let device_source = "fn device() {\n    call();\n    unreachable!(\"x\");\n}\n";
+    let window = excluded_file(directory, "window.rs", "", "Window events.");
+    let xr = excluded_file(directory, "xr.rs", device_source, "OpenXR calls.");
+    let device_region = |needle: &str, count: u64| {
+        let mut region = region_for(device_source, needle, count);
+        region[5] = json!(1);
+        region
+    };
+    let report = json!({
+        "data": [{
+            "files": [{"filename": library_path}, {"filename": xr.path}],
+            "functions": [{
+                "name": "fixture",
+                "filenames": [library_path, xr.path],
+                "regions": [
+                    region_for(library_source, "run()", library_count),
+                    device_region("{\n    call();\n    unreachable!(\"x\");\n}", 1),
+                    device_region("call()", 0),
+                    device_region("unreachable!(\"x\")", 0),
+                ],
+            }],
+        }]
+    })
+    .to_string();
+
+    (report, vec![window, xr])
+}
+
+#[test]
+fn reports_excluded_files_with_their_unfiltered_size() {
+    let directory = TemporaryDirectory::new();
+    let (report, exclusions) = report_with_device_file(&directory, 1);
+
+    let summary = summarize(&report, directory.path(), &exclusions).expect("summarize coverage");
+
+    assert!(summary.is_complete());
+    assert_eq!(summary.measured_regions, 1);
+    assert_eq!(summary.excluded_unreachable_regions, 0);
+    assert_eq!(
+        summary.success_message(),
+        "Region coverage passed: 1/1 measured source regions covered (excluded: 0 unreachable regions, 2 files)\n\
+         Excluded files, not counted towards the gate:\n  \
+         src/window.rs (no regions in this run): Window events.\n  \
+         src/xr.rs (3 regions, 1 covered; 4 lines): OpenXR calls."
+    );
+}
+
+#[test]
+fn lists_excluded_files_when_the_gate_fails() {
+    let directory = TemporaryDirectory::new();
+    let (report, exclusions) = report_with_device_file(&directory, 0);
+
+    let summary = summarize(&report, directory.path(), &exclusions).expect("summarize coverage");
+
+    assert!(!summary.is_complete());
+    assert_eq!(
+        summary.failure_message(),
+        format!(
+            "region coverage is 0/1 measured source regions (excluded: 0 unreachable regions, 2 files); 1 source regions remain uncovered\n  \
+             {}:1:13-1:18\n\
+             Excluded files, not counted towards the gate:\n  \
+             src/window.rs (no regions in this run): Window events.\n  \
+             src/xr.rs (3 regions, 1 covered; 4 lines): OpenXR calls.",
+            fs::canonicalize(directory.path().join("src/lib.rs"))
+                .expect("canonical library path")
+                .display()
+        )
+    );
+}
+
+#[test]
+fn omits_the_excluded_files_listing_without_exclusions() {
+    let directory = TemporaryDirectory::new();
+    let source = "fn work() { run(); }\n";
+    let path = source_path(&directory, source);
+    let report = report(
+        &path,
+        vec![function(&path, vec![region_for(source, "run()", 1)])],
+    );
+
+    let summary = summarize(&report, directory.path(), &[]).expect("summarize coverage");
+
+    assert_eq!(
+        summary.success_message(),
+        "Region coverage passed: 1/1 measured source regions covered (excluded: 0 unreachable regions)"
     );
 }

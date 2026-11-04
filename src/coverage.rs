@@ -9,6 +9,8 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::exclusions::Exclusion;
+
 static REPORT_ID: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
@@ -44,7 +46,7 @@ impl CoverageReport {
         &self.path
     }
 
-    pub(crate) fn read(&self, source_root: &Path) -> Result<Summary> {
+    pub(crate) fn read(&self, source_root: &Path, exclusions: &[Exclusion]) -> Result<Summary> {
         let report = fs::read_to_string(&self.path).map_err(|error| {
             Error::new(format!(
                 "failed to read coverage report {}: {error}",
@@ -52,7 +54,7 @@ impl CoverageReport {
             ))
         })?;
 
-        summarize(&report, source_root)
+        summarize(&report, source_root, exclusions)
     }
 }
 
@@ -76,12 +78,56 @@ struct SourceRegion {
     kind: usize,
 }
 
+/// The unfiltered size of a file excluded from the coverage gate.
+#[derive(Debug, PartialEq, Eq)]
+struct ExcludedFile {
+    display: String,
+    reason: String,
+    regions: usize,
+    covered_regions: usize,
+    lines: HashSet<usize>,
+}
+
+impl ExcludedFile {
+    fn new(exclusion: &Exclusion) -> Self {
+        Self {
+            display: exclusion.display.clone(),
+            reason: exclusion.reason.clone(),
+            regions: 0,
+            covered_regions: 0,
+            lines: HashSet::new(),
+        }
+    }
+
+    fn add(&mut self, region: &SourceRegion, covered: bool) {
+        self.regions += 1;
+        self.covered_regions += usize::from(covered);
+        self.lines.extend(region.start.line..=region.end.line);
+    }
+
+    fn describe(&self) -> String {
+        let size = if self.regions == 0 {
+            "no regions in this run".to_owned()
+        } else {
+            format!(
+                "{} regions, {} covered; {} lines",
+                self.regions,
+                self.covered_regions,
+                self.lines.len()
+            )
+        };
+
+        format!("\n  {} ({size}): {}", self.display, self.reason)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Summary {
     covered_regions: usize,
     measured_regions: usize,
     uncovered_regions: Vec<SourceRegion>,
     excluded_unreachable_regions: usize,
+    excluded_files: Vec<ExcludedFile>,
 }
 
 impl Summary {
@@ -91,17 +137,20 @@ impl Summary {
 
     pub(crate) fn success_message(&self) -> String {
         format!(
-            "Region coverage passed: {}/{} measured source regions covered (excluded: {} unreachable regions)",
-            self.covered_regions, self.measured_regions, self.excluded_unreachable_regions,
+            "Region coverage passed: {}/{} measured source regions covered (excluded: {}){}",
+            self.covered_regions,
+            self.measured_regions,
+            self.exclusion_counts(),
+            self.excluded_files_listing(),
         )
     }
 
     pub(crate) fn failure_message(&self) -> String {
         let mut message = format!(
-            "region coverage is {}/{} measured source regions (excluded: {} unreachable regions); {} source regions remain uncovered",
+            "region coverage is {}/{} measured source regions (excluded: {}); {} source regions remain uncovered",
             self.covered_regions,
             self.measured_regions,
-            self.excluded_unreachable_regions,
+            self.exclusion_counts(),
             self.uncovered_regions.len(),
         );
 
@@ -115,8 +164,32 @@ impl Summary {
                 region.end.column,
             ));
         }
+        message.push_str(&self.excluded_files_listing());
 
         message
+    }
+
+    fn exclusion_counts(&self) -> String {
+        let mut counts = format!("{} unreachable regions", self.excluded_unreachable_regions);
+        match self.excluded_files.len() {
+            0 => {}
+            1 => counts.push_str(", 1 file"),
+            count => counts.push_str(&format!(", {count} files")),
+        }
+        counts
+    }
+
+    /// Lists every configured exclusion, so no file leaves the gate silently.
+    fn excluded_files_listing(&self) -> String {
+        if self.excluded_files.is_empty() {
+            return String::new();
+        }
+
+        let mut listing = "\nExcluded files, not counted towards the gate:".to_owned();
+        for file in &self.excluded_files {
+            listing.push_str(&file.describe());
+        }
+        listing
     }
 }
 
@@ -205,7 +278,7 @@ impl SourceFile {
     }
 }
 
-fn summarize(report: &str, source_root: &Path) -> Result<Summary> {
+fn summarize(report: &str, source_root: &Path, exclusions: &[Exclusion]) -> Result<Summary> {
     let json: Value = serde_json::from_str(report)
         .map_err(|error| Error::new(format!("invalid cargo-llvm-cov JSON report: {error}")))?;
 
@@ -312,9 +385,18 @@ fn summarize(report: &str, source_root: &Path) -> Result<Summary> {
         measured_regions: 0,
         uncovered_regions: Vec::new(),
         excluded_unreachable_regions: 0,
+        excluded_files: exclusions.iter().map(ExcludedFile::new).collect(),
     };
 
     for (region, covered) in regions {
+        if let Some(index) = exclusions
+            .iter()
+            .position(|exclusion| exclusion.path == region.path)
+        {
+            summary.excluded_files[index].add(&region, covered);
+            continue;
+        }
+
         let Some(source) = sources.get(&region.path) else {
             unreachable!("coverage regions must refer to reported source files");
         };
@@ -354,7 +436,7 @@ fn json_usize_field(fields: &[Value], index: usize, description: &str) -> Result
         .ok_or_else(|| Error::new(format!("coverage {description} is invalid")))
 }
 
-fn resolve_source_path(reported_path: &Path, source_root: &Path) -> PathBuf {
+pub(crate) fn resolve_source_path(reported_path: &Path, source_root: &Path) -> PathBuf {
     let path = if reported_path.is_absolute() {
         reported_path.to_owned()
     } else {
