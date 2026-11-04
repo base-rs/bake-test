@@ -14,7 +14,6 @@
 //! Entries name exact files relative to the package, so each file carries its
 //! own reason and size in the coverage summary, and a renamed or deleted file
 //! fails the task instead of leaving a stale entry behind.
-
 use bake::{Context, Error, Result};
 use serde_json::Value;
 use std::collections::HashSet;

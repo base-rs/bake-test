@@ -56,6 +56,10 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 
 See [releases.md](releases.md) for the full release history.
 
+### v0.3.5
+
+- Let a package exclude specific files from the coverage gate under `[[package.metadata.bake.test.coverage.exclude]]`, each with a required `reason`. The task rejects missing reasons, missing files, and duplicate entries, and always lists each excluded file with its reason and size in regions and lines.
+
 ### v0.3.4
 
 - Update package metadata and repository links for the `base-rs` organization.
@@ -64,10 +68,6 @@ See [releases.md](releases.md) for the full release history.
 
 - Publish as `bake-test` from `core-rs/bake-test`; update imports to `bake_test`.
 - Require a `Release: vVERSION` Git trailer on the final release commit; version changes alone no longer trigger publication.
-
-### v0.3.2
-
-- Use Cargo-selected dependency versions and generated task links in setup instructions.
 
 <!-- bake-readme:releases:end -->
 
