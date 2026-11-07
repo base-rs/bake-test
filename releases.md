@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- Add a `minimum-rust` job to the canonical `test.yml`, which reads `rust-version` from the root `Cargo.toml` and checks every publishable package with that toolchain, and require it in the `test-result` aggregate.
+
 ## v0.3.5
 
 - Let a package exclude specific files from the coverage gate under `[[package.metadata.bake.test.coverage.exclude]]`, each with a required `reason`. The task rejects missing reasons, missing files, and duplicate entries, and always lists each excluded file with its reason and size in regions and lines.

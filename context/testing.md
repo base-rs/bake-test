@@ -108,7 +108,7 @@ Cargo still checks the downstream dependency's version requirement. If the local
 
 ## Canonical GitHub workflows
 
-Use this `test.yml` for Socketry Rust repositories. It runs formatting, Clippy, documentation tests, and workspace coverage. The coverage task invokes the optional `test:before` hook and requires 100% coverage of measured source regions. Passing `--all-targets true` includes examples and benchmarks in the coverage run. Do not add a separate `cargo bake test` step to this job; the coverage task runs the tests itself.
+Use this `test.yml` for Socketry Rust repositories. It runs formatting, Clippy, documentation tests, and workspace coverage, and checks the publishable packages with the declared minimum Rust version. The coverage task invokes the optional `test:before` hook and requires 100% coverage of measured source regions. Passing `--all-targets true` includes examples and benchmarks in the coverage run. Do not add a separate `cargo bake test` step to this job; the coverage task runs the tests itself.
 
 Filter both `push` and `pull_request` to `main`. Pull request updates then run through `pull_request`, without a duplicate run from the feature-branch push; merging to `main` still runs the workflow after the merge. Keep `workflow_dispatch` for manual runs.
 
@@ -145,9 +145,28 @@ jobs:
       - name: Run tests and require complete source-region coverage
         run: cargo bake --locked test:coverage --all-targets true
 
+  minimum-rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read the declared minimum Rust version
+        id: rust-version
+        run: |
+          version=$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          test -n "$version" || { echo "Cargo.toml declares no rust-version" >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust-version.outputs.version }}
+      - name: Build the publishable packages with the declared minimum Rust version
+        run: |
+          packages=$(cargo metadata --no-deps --format-version 1 --locked | jq -r '.packages[] | select(.publish != []) | "--package=\(.name)"')
+          cargo check $packages --all-targets --locked
+
   test-result:
     if: always()
-    needs: [test]
+    needs: [test, minimum-rust]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -157,6 +176,8 @@ jobs:
         run: |
           echo "$JOB_RESULTS" | jq -e 'all(.[]; .result == "success")'
 ```
+
+The `minimum-rust` job verifies the minimum supported Rust version that the root `Cargo.toml` declares with `rust-version`, in `[package]` or `[workspace.package]`. It checks every publishable package with its tests, examples, and benchmarks, skipping private packages such as the `bake/` task package, which may use newer tools. Every publishable package is checked with that version, so give them the same declaration. Raise the declaration rather than removing the job when a dependency needs a newer version.
 
 Require `test-result` alongside the publishing workflow's `check` job in the main-branch ruleset. For a matrix or several required test jobs, list every required job in `needs`. The aggregate runs even when a prerequisite fails, and succeeds only when every listed job succeeds. Keep experimental or diagnostic jobs outside that required gate.
 
