@@ -56,6 +56,10 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 
 See [releases.md](releases.md) for the full release history.
 
+### v0.3.6
+
+- Add a `minimum-rust` job to the canonical `test.yml`, which reads `rust-version` from the root `Cargo.toml` and checks every publishable package with that toolchain, and require it in the `test-result` aggregate.
+
 ### v0.3.5
 
 - Let a package exclude specific files from the coverage gate under `[[package.metadata.bake.test.coverage.exclude]]`, each with a required `reason`. The task rejects missing reasons, missing files, and duplicate entries, and always lists each excluded file with its reason and size in regions and lines.
@@ -63,11 +67,6 @@ See [releases.md](releases.md) for the full release history.
 ### v0.3.4
 
 - Update package metadata and repository links for the `base-rs` organization.
-
-### v0.3.3
-
-- Publish as `bake-test` from `core-rs/bake-test`; update imports to `bake_test`.
-- Require a `Release: vVERSION` Git trailer on the final release commit; version changes alone no longer trigger publication.
 
 <!-- bake-readme:releases:end -->
 
