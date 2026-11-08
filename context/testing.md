@@ -108,7 +108,7 @@ Cargo still checks the downstream dependency's version requirement. If the local
 
 ## Canonical GitHub workflows
 
-Use this `test.yml` for Socketry Rust repositories. It runs formatting, Clippy, documentation tests, and workspace coverage, and checks the publishable packages with the declared minimum Rust version. The coverage task invokes the optional `test:before` hook and requires 100% coverage of measured source regions. Passing `--all-targets true` includes examples and benchmarks in the coverage run. Do not add a separate `cargo bake test` step to this job; the coverage task runs the tests itself.
+Use this `test.yml` for Socketry Rust repositories. It runs formatting, Clippy, documentation tests, and workspace coverage, checks the publishable packages with the declared minimum Rust version, and checks license headers. The coverage task invokes the optional `test:before` hook and requires 100% coverage of measured source regions. Passing `--all-targets true` includes examples and benchmarks in the coverage run. Do not add a separate `cargo bake test` step to this job; the coverage task runs the tests itself.
 
 Filter both `push` and `pull_request` to `main`. Pull request updates then run through `pull_request`, without a duplicate run from the feature-branch push; merging to `main` still runs the workflow after the merge. Keep `workflow_dispatch` for manual runs.
 
@@ -164,9 +164,26 @@ jobs:
           packages=$(cargo metadata --no-deps --format-version 1 --locked | jq -r '.packages[] | select(.publish != []) | "--package=\(.name)"')
           cargo check $packages --all-targets --locked
 
+  license:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Copyright lines come from the full history of the commits under review, not of GitHub's merge commit.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          cache-shared-key: license-bake-launcher-v1
+      - name: Install Bake launcher
+        run: cargo install bake --locked
+      - name: Check license files and Rust source headers
+        run: cargo bake --locked license:check
+
   test-result:
     if: always()
-    needs: [test, minimum-rust]
+    needs: [test, minimum-rust, license]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -178,6 +195,8 @@ jobs:
 ```
 
 The `minimum-rust` job verifies the minimum supported Rust version that the root `Cargo.toml` declares with `rust-version`, in `[package]` or `[workspace.package]`. It checks every publishable package with its tests, examples, and benchmarks, skipping private packages such as the `bake/` task package, which may use newer tools. Every publishable package is checked with that version, so give them the same declaration. Raise the declaration rather than removing the job when a dependency needs a newer version.
+
+The `license` job runs `license:check` from `bake-license`, which `base-project` links into the task package. It fails, naming each file and the fix, when `license:update` would change `license.md`, the README License section, or the license header of any tracked Rust file, including test fixtures such as trybuild compile-fail cases. The Base project release hook runs `license:update`, so this check makes a missing or stale header fail the pull request that introduces it instead of changing sources, and moving the line numbers that compile-fail snapshots record, in a release. To fix a failure, run `cargo bake license:update`, regenerate any compile-fail snapshots whose line numbers moved (for trybuild, `TRYBUILD=overwrite cargo test`), and commit the result. Copyright lines come from the Git history, so the job checks out the pull request's head commit with its full history; the check refuses a shallow clone. A squash merge records one author at the merge date, so a pull request with several authors, merged in a later year, or touching a file changed on `main` since it branched can still leave stale headers; the job's run on the push to `main` reports them, and they are fixed the same way before the next release. A repository whose task package does not link `bake-license` 0.2.9 or later, which provides the task, omits this job.
 
 Require `test-result` alongside the publishing workflow's `check` job in the main-branch ruleset. For a matrix or several required test jobs, list every required job in `needs`. The aggregate runs even when a prerequisite fails, and succeeds only when every listed job succeeds. Keep experimental or diagnostic jobs outside that required gate.
 
