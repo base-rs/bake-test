@@ -1,6 +1,6 @@
 # Releases
 
-## Unreleased
+## v0.3.7
 
 - Add a `license` job to the canonical `test.yml`, which runs `license:check` on the pull request's head commit with its full history, and require it in the `test-result` aggregate, so a missing or stale license header fails the pull request that introduces it rather than changing sources in a release.
 

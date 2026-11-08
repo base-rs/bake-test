@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "bake-test"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "bake",
  "serde_json",

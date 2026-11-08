@@ -56,6 +56,10 @@ Prepare a release with `cargo bake cargo:release:patch` (or `minor`, `major`, or
 
 See [releases.md](releases.md) for the full release history.
 
+### v0.3.7
+
+- Add a `license` job to the canonical `test.yml`, which runs `license:check` on the pull request's head commit with its full history, and require it in the `test-result` aggregate, so a missing or stale license header fails the pull request that introduces it rather than changing sources in a release.
+
 ### v0.3.6
 
 - Add a `minimum-rust` job to the canonical `test.yml`, which reads `rust-version` from the root `Cargo.toml` and checks every publishable package with that toolchain, and require it in the `test-result` aggregate.
@@ -63,10 +67,6 @@ See [releases.md](releases.md) for the full release history.
 ### v0.3.5
 
 - Let a package exclude specific files from the coverage gate under `[[package.metadata.bake.test.coverage.exclude]]`, each with a required `reason`. The task rejects missing reasons, missing files, and duplicate entries, and always lists each excluded file with its reason and size in regions and lines.
-
-### v0.3.4
-
-- Update package metadata and repository links for the `base-rs` organization.
 
 <!-- bake-readme:releases:end -->
 
