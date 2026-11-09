@@ -56,6 +56,10 @@ Prepare a release with `cargo bake cargo:release:patch` (or `minor`, `major`, or
 
 See [releases.md](releases.md) for the full release history.
 
+### v0.3.9
+
+- Require `bake` 0.20 or later, instead of any 0.x version, so that Cargo resolves this crate to the same `bake` as a task package that requires `bake` 0.20.2. In a workspace whose `rust-version` is below the 1.88 that `bake` 0.20.2 declares, Cargo resolved the old requirement to `bake` 0.19.2, which declares none, and the task package failed to compile against two `bake` versions.
+
 ### v0.3.8
 
 - Declare Rust 1.88 as the minimum supported version in `rust-version`, as required by the let-chains in this crate and in `bake` 0.20.
@@ -63,10 +67,6 @@ See [releases.md](releases.md) for the full release history.
 ### v0.3.7
 
 - Add a `license` job to the canonical `test.yml`, which runs `license:check` on the pull request's head commit with its full history, and require it in the `test-result` aggregate, so a missing or stale license header fails the pull request that introduces it rather than changing sources in a release.
-
-### v0.3.6
-
-- Add a `minimum-rust` job to the canonical `test.yml`, which reads `rust-version` from the root `Cargo.toml` and checks every publishable package with that toolchain, and require it in the `test-result` aggregate.
 
 <!-- bake-readme:releases:end -->
 
