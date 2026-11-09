@@ -2,6 +2,7 @@
 name = "bake-test"
 version = "0.3.7"
 edition = "2024"
+rust-version = "1.88"
 license = "MIT"
 repository = "https://github.com/base-rs/bake-test"
 description = "Reusable Rust test tasks for Bake"
