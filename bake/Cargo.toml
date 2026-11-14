@@ -6,5 +6,5 @@ publish = false
 
 [dependencies]
 bake = ">=0.20, <1"
-bake-test = { version = "0.3.9", path = ".." }
+bake-test = { version = "0.3.10", path = ".." }
 base-project = ">=0.1.8"

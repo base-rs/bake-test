@@ -1,6 +1,6 @@
 # Releases
 
-## Unreleased
+## v0.3.10
 
 - Add `--nextest true` to `test:coverage`, which runs the test targets under `cargo llvm-cov nextest`, so that a large workspace's test binaries run in parallel and can record per-test times. Documentation tests still run through `cargo test --doc`.
 
