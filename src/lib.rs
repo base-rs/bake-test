@@ -51,6 +51,9 @@ fn run(
 /// files that workspace packages list with a reason under
 /// `package.metadata.bake.test.coverage.exclude`, are excluded from the
 /// coverage gate. The result always lists each excluded file and its size.
+/// With `--nextest true`, the test targets run under `cargo llvm-cov nextest`
+/// instead, which runs test binaries in parallel; the project's
+/// `.config/nextest.toml` and `NEXTEST_PROFILE` select its profile.
 #[bake::task(name = "test:coverage")]
 fn run_coverage(
     context: &mut Context,
@@ -59,6 +62,12 @@ fn run_coverage(
     #[bake(help = "Limit coverage to one workspace package.")] package: Option<String>,
     #[bake(named, default = false, help = "Also include examples and benchmarks.")]
     all_targets: bool,
+    #[bake(
+        named,
+        default = false,
+        help = "Run the tests with cargo-nextest, one process per test."
+    )]
+    nextest: bool,
 ) -> Result<String> {
     if all_features && !features.is_empty() {
         return Err(Error::new(
@@ -77,6 +86,9 @@ fn run_coverage(
 
     let report = coverage::CoverageReport::new()?;
     let mut coverage_arguments = vec!["llvm-cov".to_owned()];
+    if nextest {
+        coverage_arguments.push("nextest".to_owned());
+    }
     append_package_arguments(&mut coverage_arguments, package.as_deref());
     coverage_arguments.push("--locked".to_owned());
     if all_targets {

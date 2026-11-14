@@ -24,6 +24,21 @@ Run the task with the same toolchain that has `llvm-tools-preview`. If another R
 
 The task calls the optional `test:before` hook once, runs documentation tests with Cargo, then runs workspace tests under `cargo-llvm-cov`. It reports each uncovered source region and fails if any measured region remains uncovered. Regions with identical source spans are merged across function instantiations; distinct source spans remain separate, including spans on the same line. The task covers the whole workspace by default; use `--package name` to limit coverage to one package. Coverage uses the default feature set unless `--all-features true` or one or more repeatable `--features name` arguments are supplied. Choose one feature configuration per invocation; the task rejects combining `--all-features` and `--features`.
 
+### Running tests with nextest
+
+By default the test targets run under `cargo llvm-cov`, which runs Cargo's test harness one test binary at a time. A large workspace whose binaries take long can pass `--nextest true` to run them under `cargo llvm-cov nextest` instead. [cargo-nextest](https://nexte.st) runs every test in a process of its own and keeps the runner's cores busy across binaries, and it can write per-test times as JUnit XML. Coverage is measured as before: each process writes its own profile, and the report merges them. Documentation tests still run first through `cargo test --doc`, since nextest does not run them; as without `--nextest true`, they are not counted towards coverage.
+
+Install the runner alongside the coverage tool, and select a profile from the project's `.config/nextest.toml` with `NEXTEST_PROFILE`:
+
+```sh
+cargo install cargo-nextest --locked
+NEXTEST_PROFILE=ci cargo bake test:coverage --nextest true
+```
+
+In GitHub Actions, `taiki-e/install-action` installs a prebuilt `cargo-nextest` in seconds.
+
+Do not configure nextest `retries` in the profile the coverage task uses: a test that fails and then passes on a retry passes the run, so a flaky test, and the regions only its failing attempt would have reached or missed, can pass the coverage gate unnoticed. Nextest also fails when the selection has no tests to run, such as a `--package` without tests, where Cargo's harness passes; set `NEXTEST_NO_TESTS=pass` if that is expected. Tests that share state through the process, such as a global initialized by another test, or that rely on running one binary at a time, such as a fixed port or path shared between binaries, need fixing or a nextest [test group](https://nexte.st/docs/configuration/test-groups/) first. Compare the uncovered regions with and without `--nextest true` before switching: code that runs only because another test in the same process changed global state is not run when every test has a process of its own. A common case is a `log` macro's arguments, which are evaluated only when the maximum log level allows them: a test that raises it with `log::set_max_level` covers the arguments of every other test running in its process, by chance and order, but only its own under nextest. Raise the level in each test that relies on it, or in a shared test helper they all call.
+
 ### Invariant-only `unreachable!()` calls
 
 Rust checks local type-level impossibilities, such as exhaustive matches over closed enums. It does not generally prove runtime invariants that depend on relationships between values, parser behavior, or upstream code. An `unreachable!()` is a runtime assertion that panics if that invariant is violated; it is not proof that the branch cannot occur.
