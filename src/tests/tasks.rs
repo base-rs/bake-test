@@ -197,10 +197,17 @@ fn propagates_test_hook_and_cargo_failures() {
 
     let mut coverage_hook_context = context_with_hook(temporary_directory.path(), hook_fails);
     assert!(
-        run_coverage(&mut coverage_hook_context, false, vec![], None, false)
-            .expect_err("coverage task hook failure should propagate")
-            .to_string()
-            .contains("pre-test hook failed")
+        run_coverage(
+            &mut coverage_hook_context,
+            false,
+            vec![],
+            None,
+            false,
+            false
+        )
+        .expect_err("coverage task hook failure should propagate")
+        .to_string()
+        .contains("pre-test hook failed")
     );
 
     let mut context = context(temporary_directory.path());
@@ -227,7 +234,7 @@ fn runs_coverage_with_package_feature_and_target_options() {
     let mut context = context(temporary_directory.path());
 
     assert!(
-        run_coverage(&mut context, false, vec![], None, false)
+        run_coverage(&mut context, false, vec![], None, false, false)
             .expect("run default coverage task")
             .starts_with("Region coverage passed: 1/1 measured source regions")
     );
@@ -237,8 +244,15 @@ fn runs_coverage_with_package_feature_and_target_options() {
     assert!(!calls.contains("--features"));
 
     fs::write(&log, "").expect("clear fake Cargo log");
-    run_coverage(&mut context, true, vec![], Some("library".to_owned()), true)
-        .expect("run all-features package coverage");
+    run_coverage(
+        &mut context,
+        true,
+        vec![],
+        Some("library".to_owned()),
+        true,
+        false,
+    )
+    .expect("run all-features package coverage");
     let calls = fs::read_to_string(&log).expect("read all-features coverage commands");
     assert!(calls.contains("test --package library --locked --doc --all-features\n"));
     assert!(calls.contains(
@@ -252,10 +266,19 @@ fn runs_coverage_with_package_feature_and_target_options() {
         vec!["first".to_owned(), "second".to_owned()],
         None,
         false,
+        false,
     )
     .expect("run selected feature coverage");
-    let calls = fs::read_to_string(log).expect("read feature coverage commands");
+    let calls = fs::read_to_string(&log).expect("read feature coverage commands");
     assert!(calls.contains("--features first,second"));
+
+    fs::write(&log, "").expect("clear fake Cargo log");
+    run_coverage(&mut context, false, vec![], None, true, true).expect("run nextest coverage");
+    let calls = fs::read_to_string(log).expect("read nextest coverage commands");
+    assert!(calls.contains("test --workspace --locked --doc\n"));
+    assert!(
+        calls.contains("llvm-cov nextest --workspace --locked --all-targets --json --output-path ")
+    );
 }
 
 #[cfg(unix)]
@@ -278,7 +301,7 @@ fn coverage_excludes_unreachable_regions_and_rejects_uncovered_live_regions() {
     );
     let mut context = context(temporary_directory.path());
 
-    let success = run_coverage(&mut context, false, vec![], None, false)
+    let success = run_coverage(&mut context, false, vec![], None, false, false)
         .expect("unreachable line is excluded");
     assert!(success.contains("1/1 measured source regions"));
     assert!(success.contains("1 unreachable regions"));
@@ -290,7 +313,7 @@ fn coverage_excludes_unreachable_regions_and_rejects_uncovered_live_regions() {
         &[(1, 1), (2, 0)],
     );
     assert!(
-        run_coverage(&mut context, false, vec![], None, false)
+        run_coverage(&mut context, false, vec![], None, false, false)
             .expect_err("uncovered live line should fail")
             .to_string()
             .contains("1 source regions remain uncovered")
@@ -316,16 +339,23 @@ fn rejects_conflicting_coverage_options_and_reports_command_failures() {
     let mut context = context(temporary_directory.path());
 
     assert!(
-        run_coverage(&mut context, true, vec!["feature".to_owned()], None, false)
-            .expect_err("conflicting feature flags should fail")
-            .to_string()
-            .contains("choose either --all-features")
+        run_coverage(
+            &mut context,
+            true,
+            vec!["feature".to_owned()],
+            None,
+            false,
+            false
+        )
+        .expect_err("conflicting feature flags should fail")
+        .to_string()
+        .contains("choose either --all-features")
     );
     assert!(fs::read_to_string(&log).expect("read Cargo log").is_empty());
 
     environment.set("BAKE_TEST_FAIL_ON", "test");
     assert!(
-        run_coverage(&mut context, false, vec![], None, false)
+        run_coverage(&mut context, false, vec![], None, false, false)
             .expect_err("documentation test failure should propagate")
             .to_string()
             .contains("cargo test --workspace --locked --doc failed")
@@ -333,7 +363,7 @@ fn rejects_conflicting_coverage_options_and_reports_command_failures() {
 
     environment.set("BAKE_TEST_FAIL_ON", "llvm-cov");
     assert!(
-        run_coverage(&mut context, false, vec![], None, false)
+        run_coverage(&mut context, false, vec![], None, false, false)
             .expect_err("coverage command failure should propagate")
             .to_string()
             .contains("cargo llvm-cov --workspace")
@@ -344,7 +374,7 @@ fn rejects_conflicting_coverage_options_and_reports_command_failures() {
     fs::write(&invalid_report, "not JSON").expect("write invalid coverage report");
     environment.set("BAKE_TEST_COVERAGE_REPORT", &invalid_report);
     assert!(
-        run_coverage(&mut context, false, vec![], None, false)
+        run_coverage(&mut context, false, vec![], None, false, false)
             .expect_err("invalid coverage report should propagate")
             .to_string()
             .contains("invalid cargo-llvm-cov JSON report")
@@ -353,7 +383,7 @@ fn rejects_conflicting_coverage_options_and_reports_command_failures() {
     let missing_temporary_directory = temporary_directory.path().join("missing-temp");
     environment.set("TMPDIR", &missing_temporary_directory);
     assert!(
-        run_coverage(&mut context, false, vec![], None, false)
+        run_coverage(&mut context, false, vec![], None, false, false)
             .expect_err("coverage report directory creation should fail")
             .to_string()
             .contains("failed to create temporary coverage report directory")
@@ -397,7 +427,7 @@ fn coverage_lists_excluded_files_and_rejects_invalid_exclusions_before_testing()
     let mut context = context(root);
 
     assert_eq!(
-        run_coverage(&mut context, false, vec![], None, false)
+        run_coverage(&mut context, false, vec![], None, false, false)
             .expect("the excluded file does not count towards the gate"),
         "Region coverage passed: 0/0 measured source regions covered (excluded: 0 unreachable regions, 1 file)\n\
          Excluded files, not counted towards the gate:\n  \
@@ -411,7 +441,7 @@ fn coverage_lists_excluded_files_and_rejects_invalid_exclusions_before_testing()
     .expect("write metadata without a reason");
     fs::write(&log, "").expect("clear fake Cargo log");
     assert!(
-        run_coverage(&mut context, false, vec![], None, false)
+        run_coverage(&mut context, false, vec![], None, false, false)
             .expect_err("an exclusion without a reason should fail")
             .to_string()
             .contains("needs a nonempty reason")
